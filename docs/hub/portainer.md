@@ -64,6 +64,28 @@ Portainer's [stack documentation](https://docs.portainer.io/user/docker/stacks/a
 explains uploading a Compose file and importing environment variables. No repository
 checkout, relative-path volume feature or local credential JSON is needed at runtime.
 
+### Missing environment-variable errors
+
+If Portainer reports `required variable HUB_COOKIE_SECRET is missing`, open the
+stack's **Environment variables** section and choose **Load variables from .env file**
+to import the current `.env.hub`. Confirm the exact `HUB_COOKIE_SECRET` key appears
+with a nonempty value; remove a misspelled key such as
+`HUB_COOKIE_SECRETthelemartools-hub-bff`. Do not paste secret values into tickets.
+
+Uploading the YAML alone, editing `.env.hub` on the Docker host, or putting that file
+in a project volume does not populate Portainer's interpolation variables. Import
+the file again after changing it. A service-level `env_file` cannot repair a missing
+Compose `${...}` interpolation value. Keep the required-variable checks enabled.
+
+Before importing, validate the same pair locally without rendering secret values:
+
+```sh
+docker compose --env-file .env.hub -f compose.hub.portainer.yml config --quiet
+```
+
+The environment must also supply the tunnel token and a bare `HUB_PUBLIC_DOMAIN`
+hostname. The backend's public HTTPS origin is derived from that hostname.
+
 ## Login
 
 This Portainer file selects OAuth and enables identity linking by default. It

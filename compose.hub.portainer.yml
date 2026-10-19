@@ -1,4 +1,6 @@
 # Standalone OAuth Campaign Hub with Cloudflare Tunnel for Portainer.
+# Portainer: Environment variables -> Load variables from .env file -> .env.hub.
+# Uploading this Compose file does not import the separate environment file.
 # No host checkout or HUB_PROJECT_DIR is required at runtime.
 # config-init writes the Caddy/PostgreSQL files into the managed hub-project volume.
 # App images must already be built/loaded on the selected Docker endpoint.
@@ -178,7 +180,7 @@ services:
       HUB_APP_ORIGIN: https://${HUB_PUBLIC_DOMAIN:?Set HUB_PUBLIC_DOMAIN to your tunnel hostname}
       HUB_AUTH_EMERGENCY_DISABLED_PROVIDERS: ${HUB_AUTH_EMERGENCY_DISABLED_PROVIDERS:-}
       HUB_AUTH_PROVIDERS: ${HUB_AUTH_PROVIDERS:-github}
-      HUB_COOKIE_SECRET: ${HUB_COOKIE_SECRET:?Set HUB_COOKIE_SECRET}
+      HUB_COOKIE_SECRET: ${HUB_COOKIE_SECRET:?Import .env.hub in Portainer Environment variables - HUB_COOKIE_SECRET is missing}
       HUB_CSRF_SECRET: ${HUB_CSRF_SECRET:?Set HUB_CSRF_SECRET}
       HUB_DATABASE_SSL: 'false'
       HUB_HOST: 0.0.0.0
