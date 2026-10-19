@@ -1,0 +1,40 @@
+# Full Campaign Hub through a remotely managed Cloudflare Tunnel.
+# Combine with compose.hub.yml and, for password login, compose.hub.local.yml.
+# Requires Docker Compose v2.24+ for !override. See docs/hub/cloudflare-tunnel.md.
+services:
+  bff:
+    environment:
+      HUB_APP_ORIGIN: https://${HUB_PUBLIC_DOMAIN:?Set HUB_PUBLIC_DOMAIN to your tunnel hostname}
+
+  edge:
+    ports: !override []
+    volumes: !override
+      - ./deploy/hub/Caddyfile.tunnel:/etc/caddy/Caddyfile:ro
+      - hub-caddy-data:/data
+      - hub-caddy-config:/config
+    environment:
+      HUB_PUBLIC_DOMAIN: ${HUB_PUBLIC_DOMAIN:?Set HUB_PUBLIC_DOMAIN to your tunnel hostname}
+      HUB_TUNNEL_CONNECTOR_IP: ${HUB_TUNNEL_CONNECTOR_IP:-172.31.0.10}
+    networks:
+      tunnel-net:
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: 5etools-cloudflared
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TOKEN:?Set CLOUDFLARED_TOKEN in .env.hub}
+
+    depends_on:
+      edge:
+        condition: service_started
+    networks:
+      tunnel-net:
+        ipv4_address: ${HUB_TUNNEL_CONNECTOR_IP:-172.31.0.10}
+
+networks:
+  tunnel-net:
+    ipam:
+      config:
+        - subnet: ${HUB_TUNNEL_SUBNET:-172.31.0.0/24}

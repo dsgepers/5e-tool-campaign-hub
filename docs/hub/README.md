@@ -160,3 +160,12 @@ NetworkOnly in the service worker.
 
 - [Phase 0 proof notes](phase0-proof-notes.md) explain the original integration experiments. They are
   historical; current behavior is in `current-system.md`.
+
+## Personal login
+
+Use [username/password login](local-login.md) for a private JSON user allowlist without OAuth.
+Decision: [ADR 0022: Personal file-backed login](adr/0022-personal-file-login.md).
+Use [Cloudflare Tunnel](cloudflare-tunnel.md) to expose the full personal Hub through
+one public HTTPS hostname with `compose.hub.tunnel.yml`.
+For the complete stack in one file, use [Portainer setup](portainer.md) and
+`compose.hub.portainer.yml`.

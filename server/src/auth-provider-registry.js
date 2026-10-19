@@ -40,6 +40,24 @@ function normalizeAvailableProvider (provider) {
 	if (callbackPath !== getExpectedPath({slug, suffix: "callback"})) {
 		throw new TypeError(`Authentication provider callback path must match its slug.`);
 	}
+	if (provider.authenticationType === "password") {
+		if (slug !== "local" || typeof provider.pVerifyCredentials !== "function"
+			|| typeof provider.getAuthorizationUrl !== "function" || typeof provider.getIdentities !== "function" || typeof provider.hasIdentity !== "function") {
+			throw new TypeError("Local authentication provider is invalid.");
+		}
+		return Object.freeze({
+			slug,
+			label: label.trim(),
+			startPath,
+			callbackPath,
+			authenticationType: "password",
+			capabilities: normalizeCapabilities(provider.capabilities),
+			getAuthorizationUrl: context => provider.getAuthorizationUrl(context),
+			pVerifyCredentials: credentials => provider.pVerifyCredentials(credentials),
+			getIdentities: () => provider.getIdentities(),
+			hasIdentity: subject => provider.hasIdentity(subject),
+		});
+	}
 	if (typeof provider.getAuthorizationUrl !== "function" || typeof provider.pExchangeCodeForIdentity !== "function") {
 		throw new TypeError(`Authentication provider must implement authorization and code exchange.`);
 	}

@@ -4,6 +4,75 @@
 > **Last updated:** 2026-10-17
 > **Owner:** Campaign Hub maintainers
 
+## One-file Portainer validation
+
+Local working-tree checks on 2026-10-19:
+
+- Compared `docker compose --profile '*' config --format json` for
+  `compose.hub.portainer.yml` with the merged Hub/local-login/tunnel files, using
+  synthetic environment values and the same project name. All nine services,
+  startup dependencies, environments, networks, route/config mounts and volume
+  selections match after accounting for the intentional prepared-image/pull-policy
+  changes, fail-closed absolute binds and equivalent empty-option syntax.
+- A different Portainer project name retained the same explicitly named data volumes.
+  Custom image tags, existing volume prefix and a host path containing spaces also
+  validated; an omitted `HUB_PROJECT_DIR` failed before deployment. Neither topology
+  publishes a host port. No secrets were rendered into the standalone file.
+- Existing `HubDeploymentContract` and `HubDocumentationContract` passed: two suites,
+  24 tests, with the same focused command documented under tunnel validation below.
+- No running stack was stopped, images rebuilt, volume contents modified or Portainer
+  deployment performed. No application/store/schema changes require new PostgreSQL,
+  tenant, mutation, lease or event qualification for this configuration-only variant.
+
+The [Portainer guide](portainer.md) documents endpoint image preparation, host mounts,
+environment import, data-preserving handover and rollback. Portainer UI/live-provider
+qualification remains a target-environment action.
+
+## Personal Cloudflare Tunnel validation
+
+Local working-tree checks on 2026-10-19, without a real connector token or public route:
+
+- `docker compose --env-file .env.hub -f compose.hub.yml -f compose.hub.local.yml
+  -f compose.hub.tunnel.yml config --format json`, with a synthetic hostname/token,
+  passed assertions for the HTTPS backend origin, preserved password-login configuration,
+  merged edge networks, connector-only network membership and absence of published service ports.
+- Caddy `2.8.4-alpine` validated `deploy/hub/Caddyfile.tunnel` in a temporary container.
+  A separate isolated Docker network with synthetic backend/static services verified original
+  API/auth route prefixes, static fallback/cache header, public Host, HTTPS forwarding,
+  visitor-IP preservation, spoofed-XFF replacement, missing-IP fallback and WebSocket upgrade.
+  A peer at a different fixed address received 403 even with forged forwarded headers.
+  The source restriction is inside a literal-order `route` so it runs before proxy handlers.
+- Existing `HubDeploymentContract` and `HubDocumentationContract` passed: two suites,
+  24 tests, using `npm run test:unit -- test/jest/hub/HubDeploymentContract.test.js
+  test/jest/hub/HubDocumentationContract.test.js --runInBand --no-coverage --forceExit`.
+- No application/store/schema changes were made for this overlay, so PostgreSQL migration,
+  campaign mutation, lease and command-retry behavior were not changed or requalified.
+  Temporary probe containers/networks were removed; the existing Hub was not restarted.
+
+This proves local proxy wiring, not live Cloudflare connectivity, browser authentication
+through that provider, production promotion or a physical acceptance result. Setup and rollback
+are in [Cloudflare Tunnel](cloudflare-tunnel.md).
+
+## Personal file login validation
+
+Local working-tree validation on 2026-10-18 (no deployment or release qualification):
+
+- Full Hub Jest gate: 127 suites, 2,062 tests passed; eight database-dependent suites and
+  289 tests skipped without their external configuration. Jest reported a worker
+  teardown warning; the gate completed with `--forceExit`.
+- A separate isolated PostgreSQL 17 run applied all migrations, then passed nine tests across
+  `HubLocalPasswordPostgres` and `HubMultiProviderIdentityPostgres`. This exercised real account
+  provisioning, persistent campaign ownership and atomic password reauthentication/session rotation.
+- A Chromium check over HTTPS used production Hub scripts and Fastify routes with a memory store:
+  password form, rejected-password retry, successful sign-in, campaign creation and reload all
+  passed without page errors. This check does not qualify the complete Docker deployment.
+- The final focused local-login/documentation gate also covers restrictive host umask handling
+  and rejects reauthentication with another configured user's valid credentials. Changed JavaScript
+  passes ESLint, `git diff --check` passes, and the two-file Compose configuration validates.
+
+No real passwords or user content were used. The setup command and operational file-reload procedure
+are in [local login](local-login.md).
+
 ## Test layers
 
 | Layer | Location | Purpose |

@@ -6,6 +6,8 @@
 
 | Requirement/invariant | Decision/reference | Implementation | Primary tests/evidence | Operational reference |
 |---|---|---|---|---|
+| One-file Portainer stack preserves personal tunnel/login topology and existing data selection | [Portainer setup](portainer.md) | `compose.hub.portainer.yml`; prepared app images; explicit host mounts and volume names | Full merged-model equivalence; changed-project-name volume check; custom path/image/prefix and required-host-path validation | Host image/file preparation, CLI handover and rollback in [Portainer guide](portainer.md) |
+| Personal full-Hub tunnel preserves same-origin auth and narrow proxy trust | [Tunnel deployment](cloudflare-tunnel.md); existing portable ingress contract | `compose.hub.tunnel.yml`, `deploy/hub/Caddyfile.tunnel` | Compose merge validation; Caddy 2.8.4 validation; isolated API/auth/static/WebSocket and forwarded-header probes | [Tunnel setup and rollback](cloudflare-tunnel.md); live connector/hostname qualification remains external |
 | Local mode remains unchanged | ADR 0001; `current-system.md` | local repositories in Character Sheet/DM Screen | Character Sheet persistence/repository suites; broad Jest gate | staging local-only scenario |
 | Same-origin cookie BFF | ADR 0001; `security.md` | `server/src/app.js`, `index.js`, OAuth/security modules | `HubServerApp`, OAuth provider, route contract | [deployment guide](deployment.md); [deploy/promote runbook](runbooks/deploy-promote.md) |
 | Tenant/role isolation | `permission-matrix.md` | route guards + PostgreSQL store + tenant constraints | `HubAuthorizationMatrix`, `HubInviteRoleSafety` | [incident](runbooks/incident.md) and [member-removal](runbooks/member-removal.md) runbooks |
@@ -85,3 +87,14 @@ The content-specific modules (`js/hub/hub-content-policy.js`,
 `server/src/campaign-content-policy.js`, `server/scripts/generate-content-catalog.mjs`, and
 `server/data/campaign-content-site-catalog.json`) are isolated from non-content rule evaluation. Migration
 `server/migrations/0007*` is untouched; immutable `rules_versions` storage is sufficient.
+
+## Personal authentication option
+
+ADR 0022 adds explicit file-backed local identities for personal deployments.
+`LocalPasswordProvider`, the `hub:user` command, and `compose.hub.local.yml`
+provide bounded scrypt verification, private file provisioning and a read-only BFF
+mount. Existing PostgreSQL identity and sign-in/reauthentication transactions own
+accounts and sessions; campaign permissions are unchanged. Validation: local
+provider/API/CLI regressions in `HubLocalPassword.test.js`, real PostgreSQL flows
+in `HubLocalPasswordPostgres.test.js`, and the existing OAuth/identity suites.
+This is a local implementation, not a promotion of the deployed OAuth service.

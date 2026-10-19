@@ -123,7 +123,7 @@ export async function pRenderHubAuthProviders ({
 		} else {
 			link.href = `${provider.startPath}?${new URLSearchParams({returnTo})}`;
 		}
-		link.textContent = `Sign in with ${provider.label}`;
+		link.textContent = provider.slug === "local" ? "Sign in with username and password" : `Sign in with ${provider.label}`;
 		group.append(link);
 	}
 	signIn.replaceWith(group);

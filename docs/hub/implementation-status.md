@@ -5,6 +5,23 @@
 
 ## Status
 
+The personal full-Hub tunnel topology also has a standalone Portainer Compose file
+(`compose.hub.portainer.yml`). It references prepared local images, absolute host
+files and explicitly named volumes. Configuration equivalence is locally validated;
+no Portainer UI deployment or production promotion is claimed. See [setup](portainer.md).
+
+The optional [Cloudflare Tunnel overlay](cloudflare-tunnel.md) is implemented for
+personal full-Hub hosting. It adds a connector, an internal Caddy origin, exact
+connector-IP trust and public-origin configuration, with no schema/application
+changes. Local Compose/proxy validation is separate from live Cloudflare token,
+route and hostname qualification; no public deployment is claimed.
+
+Personal installations can now opt into [file-based username/password login](local-login.md)
+using the local Compose override. This working-tree change preserves PostgreSQL campaign/session
+authority and the default OAuth setup, adds no migration, and has not been deployed. File-listed
+accounts, password reauthentication, disabled-user session rejection and campaign isolation have
+automated coverage; local PostgreSQL and browser checks are recorded in [testing](testing.md#personal-file-login-validation).
+
 Wave A0-A6 implementation, independent review, chosen-branch integration and publication completed at
 `4d9a722075e74a5f48ac1500f4f1cb756ad4bf21`. All four exact-source jobs passed in
 [CI run 38420205764](https://github.com/TrueMichato/ThelemarTools/actions/runs/38420205764).

@@ -1,3 +1,4 @@
+import {provisionLocalAccounts} from "./local-password-provider.js";
 import {createHubApp} from "./app.js";
 import {createAuthProviderConfiguration} from "./auth-provider-config.js";
 import {getClientIpHeader} from "./client-ip.js";
@@ -50,6 +51,17 @@ if (multiTargetOperationsCampaignIds.length) {
 		campaignIds: multiTargetOperationsCampaignIds,
 	});
 }
+const {
+	authProviderRegistry,
+	identityRetentionRequiredProviders,
+} = createAuthProviderConfiguration({
+	onConfigurationError: ({slug, code}) => {
+		process.stderr.write(`Authentication provider ${slug} configuration failed (${code}).\n`);
+	},
+});
+for (const provider of authProviderRegistry.getAvailableProviders()) {
+	if (provider.authenticationType === "password") await provisionLocalAccounts({store, provider});
+}
 await store.pReconcileConfiguredOperatorEntitlements({
 	accountIds: operatorAccountIds,
 	onWarning: ({accountId}) => {
@@ -59,14 +71,7 @@ await store.pReconcileConfiguredOperatorEntitlements({
 if (isAccountEntitlementsEnabled && !await store.pHasActivePlatformOperator()) {
 	throw new Error(`Account entitlement enforcement requires an active platform operator.`);
 }
-const {
-	authProviderRegistry,
-	identityRetentionRequiredProviders,
-} = createAuthProviderConfiguration({
-	onConfigurationError: ({slug, code}) => {
-		process.stderr.write(`Authentication provider ${slug} configuration failed (${code}).\n`);
-	},
-});
+
 const app = await createHubApp({
 	store,
 	authProviderRegistry,

@@ -27,7 +27,37 @@
 | R-19 | Reused instance is stopped and cannot be restarted | A stop releases the host allocation; the subsequent start is a fresh capacity request against an exhausted pool | Permanent loss of the only usable host; hub offline with no rebuild path | Never stop — reboot only. No shape resize and no boot-volume detach/attach. Test an out-of-band serial-console login, retain off-VM data backups, and defer changes that require a restorable boot-volume rollback | Runbook states the rule at the top of Part C-ALT and tags each operation with whether it requires a stop | Restore onto a new instance once capacity returns, or use the paid path |
 
 | R-20 | Release upgrade bricks the irreplaceable instance | Existing host is Ubuntu 22.04.4. No replacement/helper capacity exists; a restored boot volume cannot be used without a new instance or stopping this one. Serial console recovers many network/SSH failures but is not a rollback for every boot, filesystem, or package failure | Staging host lost with no same-day recovery; V1 pilot unavailable | **24.04 release upgrade deferred.** Fully patch supported 22.04, enable free Ubuntu Pro `esm-apps`, and install Docker from its supported Jammy repository. Test serial-console recovery independently. Prefer a fresh 24.04 rebuild when capacity exists | Ubuntu Pro status, package updates, reboot verification, serial-console drill, off-VM backup evidence | Re-evaluate before 22.04 standard maintenance ends in May 2027, and only when replacement/helper capacity exists or permanent host loss is explicitly accepted |
+## Personal file login
+
+ADR 0022 permits a host-managed credential file for explicitly selected personal installations.
+Password hashes remain sensitive: `.hub/` is private, gitignored, excluded from both build contexts,
+and only its user file is mounted read-only into the backend. There is no browser/static credential
+endpoint or public signup. The host must retain the file and stable user UUIDs alongside database
+recovery material to preserve account access after a restore.
+
+The backend loads credentials at startup. Recreate it after file edits; removing/disabling an identity
+then rejects existing sessions. Changing an enabled user's password alone leaves existing sessions
+valid; use session revocation when needed. This is an accepted personal-use tradeoff, documented in
+[local login](local-login.md), with rate-limit, generic-error, cross-account reauthentication and
+PostgreSQL session-rotation regression coverage. OAuth remains the default.
+
 ## Review rule
+
+The standalone Portainer file deliberately duplicates the merged personal topology;
+maintainers must compare its normalized Compose model after changes to the base or
+overlays. Explicit volume names prevent a Portainer stack-name change from selecting
+an empty database, but the host must confirm any custom existing volume prefix and
+stop the old installation before handover. Two PostgreSQL containers must never
+share a data volume concurrently. [Portainer setup](portainer.md) covers prepared
+images, absolute host paths, retained data and rollback; no running stack is changed
+by configuration validation.
+
+The personal Cloudflare overlay addresses R-08 by restricting Caddy's origin
+listener to the connector's exact IP, preserving `CF-Connecting-IP` only from
+that peer and replacing forwarded-client headers before the existing BFF trust
+boundary. Host ports are removed. Local proxy checks do not qualify a real
+Cloudflare route, account policy or connector token; verify these as described in
+[the tunnel guide](cloudflare-tunnel.md) before using the public hostname.
 
 Review this register at every phase boundary, after any incident/security finding, and before go/no-go.
 Closing a risk requires evidence in `traceability.md`; renaming or moving it is not closure.

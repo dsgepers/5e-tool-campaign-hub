@@ -12,6 +12,17 @@ deployed evidence until separately promoted. Start here when changing Hub behavi
 domain, protocol, security, operations, and
 [living roadmap](roadmap.md) references.
 
+An explicit personal file-backed login mode is also implemented; see
+[local login](local-login.md) and [ADR 0022](adr/0022-personal-file-login.md).
+OAuth remains the default, with the private cohort admission contract below.
+
+Personal deployments can also add [Cloudflare Tunnel](cloudflare-tunnel.md) with
+`compose.hub.tunnel.yml`. It routes the full Hub through a connector-only Caddy
+origin and sets the public HTTPS origin, without changing application authority
+or the deployed Oracle baseline.
+The same personal topology is available in one file for Portainer Docker Standalone:
+`compose.hub.portainer.yml`; see [host/image preparation and handover](portainer.md).
+
 ## Product boundary
 
 The Campaign Hub is an optional online layer over the existing local-first site.

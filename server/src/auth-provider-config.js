@@ -1,3 +1,4 @@
+import {LocalPasswordProvider} from "./local-password-provider.js";
 import {
 	AuthProviderRegistry,
 	createAuthProviderRegistration,
@@ -87,6 +88,15 @@ export function createAuthProviderConfiguration ({
 	onConfigurationError = null,
 	fnFetchByProvider = {},
 }) {
+	const mode = env.HUB_AUTH_MODE || "oauth";
+	if (mode === "local") {
+		const provider = LocalPasswordProvider.fromFile(env.HUB_LOCAL_USERS_FILE);
+		return {
+			authProviderRegistry: new AuthProviderRegistry({registrations: [{status: "available", provider}]}),
+			identityRetentionRequiredProviders: ["local"],
+		};
+	}
+	if (mode !== "oauth") throw new TypeError("HUB_AUTH_MODE must be oauth or local.");
 	const configured = getProviderSet(env.HUB_AUTH_PROVIDERS, ["github"]);
 	const emergencyDisabled = getProviderSet(env.HUB_AUTH_EMERGENCY_DISABLED_PROVIDERS);
 	if (configured.has("discord") !== configured.has("google")) {

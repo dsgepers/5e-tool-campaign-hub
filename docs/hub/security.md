@@ -11,6 +11,14 @@
 - PostgreSQL is canonical; client snapshots never overwrite state without revision and fencing checks.
 - Campaign homebrew is DM-authored but still untrusted content.
 
+The optional [personal Cloudflare Tunnel](cloudflare-tunnel.md) keeps these boundaries:
+only the fixed connector IP can reach the tunnel origin's proxy handlers, and only
+that peer's `CF-Connecting-IP` is trusted. Caddy replaces `X-Forwarded-For` before
+the BFF's existing exact-Caddy-address trust check. The overlay publishes no host
+ports and derives the exact HTTPS application origin from its public hostname.
+The tunnel token stays in the connector environment; no backend/browser credential
+or campaign authority change is introduced.
+
 ### Owner Roll History
 
 The protocol-5 `character.roll_history.v1` read requires current active membership/account and ownership
@@ -232,3 +240,16 @@ sandboxed renderer, malicious fixture corpus, and another security review.
   backup, isolated restore, and exact-release rollback evidence remain the V1 host-operations gate.
 - Exactly one BFF replica is supported; private V1 accepts application restart/deploy downtime until shared
   realtime fanout exists.
+
+## Explicit personal file-backed authentication
+
+[ADR 0022](adr/0022-personal-file-login.md) permits an opt-in personal deployment
+using `HUB_AUTH_MODE=local`. Its private file allowlist supplies pre-provisioned
+`local` identities rather than opening public registration. Passwords use bounded
+scrypt with random salts; only hashes are stored in the server-only file. Login
+requires exact Origin and a signed-cookie-bound one-use login transaction, applies
+per-IP rate limits, and uses the same PostgreSQL session completion/rotation and
+campaign authorization as OAuth. The POST body must not be logged. The password
+file is excluded from images and mounted read-only into the BFF. Recreate the BFF
+after changes; removed/disabled identities cannot continue using saved sessions.
+OAuth identity linking is unavailable in this mode. See [setup](local-login.md).

@@ -1,0 +1,40 @@
+{
+	servers {
+		trusted_proxies static {$HUB_TUNNEL_CONNECTOR_IP}
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+(hub_backend) {
+	reverse_proxy bff:5052 {
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Forwarded-Proto https
+	}
+}
+
+# Public TLS terminates at Cloudflare. This listener has no published host port.
+http://{$HUB_PUBLIC_DOMAIN}:8080 {
+	# route preserves this order: reject other peers before any proxy handler.
+	route {
+		@outsideTunnel not remote_ip {$HUB_TUNNEL_CONNECTOR_IP}
+		respond @outsideTunnel 403
+		encode zstd gzip
+
+		handle /api/* {
+			import hub_backend
+		}
+
+		handle /auth/* {
+			import hub_backend
+		}
+
+		handle /ws/* {
+			import hub_backend
+		}
+
+		handle {
+			header Cache-Control "public, max-age=0, must-revalidate"
+			reverse_proxy static:80
+		}
+	}
+}

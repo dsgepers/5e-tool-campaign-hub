@@ -671,3 +671,22 @@ The rate-limit plugin is not global. Explicit route limits currently apply to OA
 callback (20/min), campaign creation (10/min), invite creation (20/min), and invite redemption (20/min).
 WebSockets enforce 20 inbound messages/second/connection separately. Phase 6 observability/load work must
 validate whether additional per-route limits are needed before broader onboarding.
+
+## Optional personal login routes
+
+With `HUB_AUTH_MODE=local`, provider metadata advertises only `local`.
+`GET /auth/local/start?returnTo=...` creates the existing browser-bound login
+transaction and redirects to `GET /auth/local/login?state=...`, which renders a
+no-store username/password form. `POST /auth/local/callback` accepts URL-encoded
+`username`, `password`, and `state` (8 KiB body cap; password max 256 characters),
+requires the exact app Origin and signed transaction cookie, and returns a 303
+redirect with the normal secure session cookie on success. Invalid credentials
+return the same 401 form for unknown, disabled, and incorrect-password users.
+The form never reflects a submitted password.
+
+`POST /api/account/reauthentication/local` uses the existing authenticated
+Origin/CSRF/protocol checks and returns the password-form URL. Completion rotates
+the same-account session through the existing transactional authority. The local
+provider has no GET callback accepting credential-like query parameters and makes
+no external OAuth requests. All normal `/api/session`, logout, membership and
+campaign routes keep their contracts.

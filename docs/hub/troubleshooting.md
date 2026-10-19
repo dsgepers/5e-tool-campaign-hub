@@ -10,6 +10,11 @@ documents into tickets/logs.
 
 | Symptom | First checks | Likely areas | Safe next action |
 |---|---|---|---|
+| Portainer cannot start the one-file Hub stack or campaigns appear missing | selected Docker endpoint, prepared image tags, absolute `HUB_PROJECT_DIR`, existing volume names and `HUB_VOLUME_PREFIX` | images/host files absent on endpoint or different data-volume selection | follow [Portainer preparation and handover](portainer.md); retain volumes and existing passwords, then correct the image/path/prefix before deploying |
+| Cloudflare tunnel is healthy but Hub fails | route service URL, hostname, edge/backend status and connector IP | tunnel origin routing or public-origin mismatch | follow [tunnel troubleshooting](cloudflare-tunnel.md#troubleshoot-and-return-to-local-access); route the whole hostname to `http://edge:8080`, preserving Host and `CF-Connecting-IP` |
+| Local-login bind mount is missing or the BFF cannot read its users file | `.hub/users.json` exists, private parent permissions and file readability; do not print file contents | personal credential setup/mount | run `npm run hub:user -- --username YOUR_NAME`, then use both Hub Compose files as shown in [local login](local-login.md) |
+| Local password changes have no effect | BFF container recreation after the edit | credentials are loaded at startup and the CLI atomically replaces the file | recreate the BFF with both Compose files; a simple process restart may retain the previous file bind mount |
+| Local user signs in but existing OAuth campaigns are missing | original account identity and selected authentication mode | local and OAuth identities are separate accounts | return to OAuth to access that account; do not replace file UUIDs or assume matching names merge ownership |
 | BFF refuses startup | Required env, DB reachability, `hub.accounts` | `server/src/index.js`, migration | Run health/migration status; do not bypass readiness |
 | `/api/health` returns 503 | DB connectivity/schema | pool TLS/role/schema | Inspect DB/provider health and migration status |
 | OAuth loops/fails | callback URL, app origin, OAuth cookie, subject allowlist | proxy origin/cookie/PKCE | Verify exact origin/callback and numeric subject |

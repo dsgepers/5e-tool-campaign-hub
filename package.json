@@ -68,6 +68,7 @@
 		"hooks:precommit": "node scripts/hooks/run-precommit.mjs",
 		"hooks:prepush": "node scripts/hooks/run-prepush.mjs",
 		"hooks:e2e-smoke": "node scripts/hooks/run-e2e-smoke.mjs",
+		"hub:user": "node server/scripts/local-user.mjs",
 		"hub:serve": "node server/src/index.js",
 		"hub:migrate": "node server/scripts/migrate.mjs",
 		"hub:migrate:plan": "node server/scripts/migrate.mjs plan",

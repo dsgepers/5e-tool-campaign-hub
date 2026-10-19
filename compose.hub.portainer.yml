@@ -1,0 +1,240 @@
+# Standalone personal Campaign Hub: PostgreSQL, password login and Cloudflare Tunnel.
+# Upload this file alone to a Portainer Docker Standalone stack (not Swarm).
+# App images must already be built/loaded on the selected Docker endpoint.
+# HUB_PROJECT_DIR is an absolute path on that Docker host, not on your browser PC.
+# Explicit volume names preserve the existing default CLI stack's campaign data.
+# Stop the original stack before deployment; never run two stacks on the same DB volume.
+# Setup, image preparation and migration: docs/hub/portainer.md.
+name: thelemartools-hub
+services:
+  db:
+    image: postgres:17.6-bookworm
+    environment:
+      HUB_BACKUP_DB_PASSWORD: ${HUB_BACKUP_DB_PASSWORD:?Set HUB_BACKUP_DB_PASSWORD}
+      HUB_OPERATIONS_DB_PASSWORD: ${HUB_OPERATIONS_DB_PASSWORD:?Set HUB_OPERATIONS_DB_PASSWORD}
+      HUB_RUNTIME_DB_PASSWORD: ${HUB_RUNTIME_DB_PASSWORD:?Set HUB_RUNTIME_DB_PASSWORD}
+      POSTGRES_DB: hub
+      POSTGRES_PASSWORD: ${HUB_POSTGRES_PASSWORD:?Set HUB_POSTGRES_PASSWORD}
+      POSTGRES_USER: hub_owner
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 30s
+      test:
+        - CMD-SHELL
+        - pg_isready -h 127.0.0.1 -U hub_owner -d hub
+      timeout: 5s
+    networks:
+      hub-private: {}
+    restart: unless-stopped
+    volumes:
+      - source: hub-postgres
+        target: /var/lib/postgresql/data
+        type: volume
+      - bind:
+          create_host_path: false
+        read_only: true
+        source: ${HUB_PROJECT_DIR:?Set HUB_PROJECT_DIR to the absolute checkout path on the Docker host}/deploy/hub/init-roles.sh
+        target: /docker-entrypoint-initdb.d/10-hub-roles.sh
+        type: bind
+  migrate:
+    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    command:
+      - node
+      - server/scripts/migrate.mjs
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://hub_owner:${HUB_POSTGRES_PASSWORD}@db:5432/hub
+      HUB_DATABASE_SSL: 'false'
+    networks:
+      hub-private: {}
+    restart: 'no'
+    pull_policy: never
+  grant-roles:
+    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    command:
+      - node
+      - server/scripts/grant-roles.mjs
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://hub_owner:${HUB_POSTGRES_PASSWORD}@db:5432/hub
+      HUB_BACKUP_DB_PASSWORD: ${HUB_BACKUP_DB_PASSWORD:?Set HUB_BACKUP_DB_PASSWORD}
+      HUB_BACKUP_DB_ROLE: hub_backup
+      HUB_DATABASE_SSL: 'false'
+      HUB_OPERATIONS_DB_PASSWORD: ${HUB_OPERATIONS_DB_PASSWORD:?Set HUB_OPERATIONS_DB_PASSWORD}
+      HUB_OPERATIONS_DB_ROLE: hub_operations
+      HUB_RUNTIME_DB_PASSWORD: ${HUB_RUNTIME_DB_PASSWORD:?Set HUB_RUNTIME_DB_PASSWORD}
+      HUB_RUNTIME_DB_ROLE: hub_runtime
+    networks:
+      hub-private: {}
+    restart: 'no'
+    pull_policy: never
+  bff:
+    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    depends_on:
+      grant-roles:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://hub_runtime:${HUB_RUNTIME_DB_PASSWORD}@db:5432/hub
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      HUB_ACCOUNT_ENTITLEMENTS_ENABLED: ${HUB_ACCOUNT_ENTITLEMENTS_ENABLED:-false}
+      HUB_ACCOUNT_IDENTITY_LINKING_ENABLED: 'false'
+      HUB_ALLOWED_OAUTH_SUBJECTS: ${HUB_ALLOWED_OAUTH_SUBJECTS:-}
+      HUB_APP_ORIGIN: https://${HUB_PUBLIC_DOMAIN:?Set HUB_PUBLIC_DOMAIN to your tunnel hostname}
+      HUB_AUTH_EMERGENCY_DISABLED_PROVIDERS: ${HUB_AUTH_EMERGENCY_DISABLED_PROVIDERS:-}
+      HUB_AUTH_PROVIDERS: ${HUB_AUTH_PROVIDERS:-github}
+      HUB_COOKIE_SECRET: ${HUB_COOKIE_SECRET:?Set HUB_COOKIE_SECRET}
+      HUB_CSRF_SECRET: ${HUB_CSRF_SECRET:?Set HUB_CSRF_SECRET}
+      HUB_DATABASE_SSL: 'false'
+      HUB_HOST: 0.0.0.0
+      HUB_IDENTITY_RETENTION_REQUIRED_PROVIDERS: local
+      HUB_INVITE_ACCOUNT_ADMISSION_ENABLED: ${HUB_INVITE_ACCOUNT_ADMISSION_ENABLED:-false}
+      HUB_INVITE_TOKEN_PREVIOUS_SECRETS: ${HUB_INVITE_TOKEN_PREVIOUS_SECRETS:-}
+      HUB_INVITE_TOKEN_SECRET: ${HUB_INVITE_TOKEN_SECRET:?Set HUB_INVITE_TOKEN_SECRET}
+      HUB_LOG_LEVEL: ${HUB_LOG_LEVEL:-info}
+      HUB_METRICS_TOKEN: ${HUB_METRICS_TOKEN:?Set HUB_METRICS_TOKEN}
+      HUB_MULTI_TARGET_OPERATIONS_CAMPAIGN_IDS: ${HUB_MULTI_TARGET_OPERATIONS_CAMPAIGN_IDS:-}
+      HUB_OPERATOR_ACCOUNT_IDS: ${HUB_OPERATOR_ACCOUNT_IDS:-}
+      HUB_PEER_SOURCE_COSTS_CAMPAIGN_IDS: ${HUB_PEER_SOURCE_COSTS_CAMPAIGN_IDS:-}
+      HUB_PORT: '5052'
+      HUB_TRUST_PROXY: ${HUB_TRUST_PROXY:-172.30.0.10}
+      HUB_AUTH_MODE: local
+      HUB_LOCAL_USERS_FILE: /run/hub/users.json
+    networks:
+      hub-egress: {}
+      hub-private: {}
+    read_only: true
+    restart: unless-stopped
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    volumes:
+      - bind:
+          create_host_path: false
+        read_only: true
+        source: ${HUB_PROJECT_DIR:?Set HUB_PROJECT_DIR to the absolute checkout path on the Docker host}/.hub/users.json
+        target: /run/hub/users.json
+        type: bind
+    pull_policy: never
+  static:
+    image: ${HUB_STATIC_IMAGE:-thelemartools-hub-static:latest}
+    networks:
+      hub-private: {}
+    restart: unless-stopped
+    pull_policy: never
+  edge:
+    image: caddy:2.8.4-alpine
+    depends_on:
+      bff:
+        condition: service_healthy
+      static:
+        condition: service_started
+    environment:
+      HUB_PUBLIC_DOMAIN: ${HUB_PUBLIC_DOMAIN:?Set HUB_PUBLIC_DOMAIN to your tunnel hostname}
+      HUB_TUNNEL_CONNECTOR_IP: ${HUB_TUNNEL_CONNECTOR_IP:-172.31.0.10}
+    networks:
+      hub-private:
+        ipv4_address: ${HUB_EDGE_PRIVATE_IP:-172.30.0.10}
+      hub-public: {}
+      tunnel-net: {}
+    ports: []
+    restart: unless-stopped
+    volumes:
+      - bind:
+          create_host_path: false
+        read_only: true
+        source: ${HUB_PROJECT_DIR:?Set HUB_PROJECT_DIR to the absolute checkout path on the Docker host}/deploy/hub/Caddyfile.tunnel
+        target: /etc/caddy/Caddyfile
+        type: bind
+      - source: hub-caddy-data
+        target: /data
+        type: volume
+      - source: hub-caddy-config
+        target: /config
+        type: volume
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+    container_name: 5etools-cloudflared
+    depends_on:
+      edge:
+        condition: service_started
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TOKEN:?Set CLOUDFLARED_TOKEN in .env.hub}
+    networks:
+      tunnel-net:
+        ipv4_address: ${HUB_TUNNEL_CONNECTOR_IP:-172.31.0.10}
+    restart: unless-stopped
+  maintenance:
+    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    command:
+      - node
+      - server/scripts/maintenance.mjs
+    depends_on:
+      grant-roles:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://hub_runtime:${HUB_RUNTIME_DB_PASSWORD}@db:5432/hub
+      HUB_DATABASE_SSL: 'false'
+      HUB_MAINTENANCE_BATCH_SIZE: ${HUB_MAINTENANCE_BATCH_SIZE:-1000}
+    networks:
+      hub-private: {}
+    profiles:
+      - maintenance
+    restart: 'no'
+    pull_policy: never
+  backup:
+    image: ${HUB_OPS_IMAGE:-thelemartools-hub-ops:latest}
+    command:
+      - sh
+      - -ec
+      - node server/scripts/backup-encrypted.mjs "/backups/hub-$$(date -u +%Y%m%dT%H%M%SZ).dump.enc"
+    depends_on:
+      grant-roles:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://hub_backup:${HUB_BACKUP_DB_PASSWORD}@db:5432/hub
+      HUB_BACKUP_ENCRYPTION_KEY: ${HUB_BACKUP_ENCRYPTION_KEY:?Set HUB_BACKUP_ENCRYPTION_KEY}
+      HUB_OPERATIONS_DATABASE_URL: postgresql://hub_operations:${HUB_OPERATIONS_DB_PASSWORD}@db:5432/hub
+    networks:
+      hub-private: {}
+    profiles:
+      - backup
+    restart: 'no'
+    volumes:
+      - source: hub-backups
+        target: /backups
+        type: volume
+    pull_policy: never
+volumes:
+  hub-backups:
+    name: ${HUB_VOLUME_PREFIX:-thelemartools-hub}_hub-backups
+  hub-caddy-config:
+    name: ${HUB_VOLUME_PREFIX:-thelemartools-hub}_hub-caddy-config
+  hub-caddy-data:
+    name: ${HUB_VOLUME_PREFIX:-thelemartools-hub}_hub-caddy-data
+  hub-postgres:
+    name: ${HUB_VOLUME_PREFIX:-thelemartools-hub}_hub-postgres
+networks:
+  hub-egress: {}
+  hub-private:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${HUB_PRIVATE_SUBNET:-172.30.0.0/24}
+  hub-public: {}
+  tunnel-net:
+    ipam:
+      config:
+        - subnet: ${HUB_TUNNEL_SUBNET:-172.31.0.0/24}

@@ -4,6 +4,14 @@
 > **Last verified:** 2026-09-01
 > **Owner:** Campaign Hub maintainers
 
+For personal username/password login without an OAuth application, see
+[local login](local-login.md) and the `compose.hub.local.yml` override.
+For the full Hub behind Cloudflare Tunnel, see [the tunnel guide](cloudflare-tunnel.md)
+and add `compose.hub.tunnel.yml` last. That overlay replaces the edge's published
+ports with a connector-only HTTP origin; it does not alter the default local stack.
+For Portainer Docker Standalone, [the one-file stack](portainer.md) uses
+`compose.hub.portainer.yml`, prepared app images and explicit host paths/volume names.
+
 ## Purpose
 
 The reference stack proves the provider-independent runtime contract. It supports local verification and the

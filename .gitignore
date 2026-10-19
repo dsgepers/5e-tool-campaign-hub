@@ -60,3 +60,6 @@ npc-exports/
 
 # Page-load performance harness results (scripts/perf/measure.mjs --out)
 perf-*.json
+
+# Server-only local login credentials
+.hub/

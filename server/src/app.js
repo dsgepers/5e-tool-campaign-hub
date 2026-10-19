@@ -1,3 +1,4 @@
+import {getLocalLoginHtml} from "./local-login-html.js";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
@@ -269,6 +270,9 @@ export async function createHubApp ({
 	const providerRegistry = authProviderRegistry || getLegacyGitHubAuthProviderRegistry(oauthProvider);
 	const config = validateConfig(rawConfig);
 	const registeredProviderSlugs = new Set(providerRegistry.getPublicMetadata().map(provider => provider.slug));
+	if (registeredProviderSlugs.has("local") && config.isAccountIdentityLinkingEnabled) {
+		throw new TypeError("Local login does not support OAuth identity linking. Disable HUB_ACCOUNT_IDENTITY_LINKING_ENABLED.");
+	}
 	if (config.identityRetentionRequiredProviders.some(provider => !registeredProviderSlugs.has(provider))) {
 		throw new TypeError(`Identity retention providers must be registered authentication providers.`);
 	}
@@ -324,6 +328,15 @@ export async function createHubApp ({
 			});
 		},
 	});
+	if (registeredProviderSlugs.has("local")) {
+		app.addContentTypeParser("application/x-www-form-urlencoded", {parseAs: "string", bodyLimit: 8_192}, (request, body, done) => {
+			const fields = new URLSearchParams(body);
+			if ([...fields.keys()].length !== new Set(fields.keys()).size) {
+				return done(new HubStoreError("INVALID_REQUEST", "Duplicate form fields.", {status: 400}));
+			}
+			done(null, Object.fromEntries(fields));
+		});
+	}
 	await app.register(rateLimit, {
 		global: false,
 		max: 30,
@@ -407,6 +420,12 @@ export async function createHubApp ({
 		const token = getSignedCookie(request, SESSION_COOKIE);
 		if (!token) return null;
 		request.hubAuth = await store.pGetSessionByTokenHash({tokenHash: getSha256(token)});
+		const localProvider = providerRegistry.getAvailableProviders().find(provider => provider.authenticationType === "password");
+		if (request.hubAuth && localProvider) {
+			const identities = await store.pListExternalIdentities({accountId: request.hubAuth.account.id});
+			if (!identities.some(identity => identity.id === request.hubAuth.session.authenticatedViaIdentityId
+				&& identity.provider === "local" && localProvider.hasIdentity(identity.subject))) request.hubAuth = null;
+		}
 		return request.hubAuth;
 	};
 
@@ -933,6 +952,82 @@ export async function createHubApp ({
 		});
 	});
 
+	const pCompleteProviderSession = async ({request, reply, provider, transaction, identity, clearTransactionCookies, redirectStatus = 302}) => {
+		const priorAuth = await pGetAuth(request);
+		const token = transaction.operation === "link"
+			? getDeterministicToken({
+				secret: config.cookieSecret,
+				namespace: "hub-identity-link-session",
+				parts: [transaction.id],
+			})
+			: getRandomToken();
+		let completed;
+		try {
+			if (transaction.operation === "reauthenticate") {
+				completed = await store.pCompleteOAuthReauthentication({
+					identity,
+					tokenHash: getSha256(token),
+					expiresAt: new Date(Date.now() + config.sessionTtlSeconds * 1_000),
+					userAgent: request.headers["user-agent"] || null,
+					currentSessionId: priorAuth?.session.id || null,
+					oauthTransactionId: transaction.id,
+				});
+			} else if (transaction.operation === "sign_in") {
+				completed = await store.pCompleteOAuthSignIn({
+					identity,
+					tokenHash: getSha256(token),
+					expiresAt: new Date(Date.now() + config.sessionTtlSeconds * 1_000),
+					userAgent: request.headers["user-agent"] || null,
+					priorSessionId: priorAuth?.session.id || null,
+					oauthTransactionId: transaction.id,
+					isNewAccountAdmissionEnabled: config.isInviteAccountAdmissionEnabled,
+				});
+			} else if (transaction.operation === "link") {
+				completed = await store.pCompleteOAuthLink({
+					identity,
+					tokenHash: getSha256(token),
+					expiresAt: new Date(Date.now() + config.sessionTtlSeconds * 1_000),
+					userAgent: request.headers["user-agent"] || null,
+					currentAccountId: priorAuth?.account.id || null,
+					currentSessionId: priorAuth?.session.id || null,
+					oauthTransactionId: transaction.id,
+					availableProviders: providerRegistry.getAvailableProviders().map(current => current.slug),
+				});
+			} else {
+				throw new HubStoreError("INVALID_OAUTH_STATE", `OAuth transaction is invalid.`, {status: 400});
+			}
+		} catch (error) {
+			if ([
+				"INVITE_ADMISSION_REQUIRED",
+				"INVITE_ADMISSION_INVALID",
+				"ACCOUNT_UNAVAILABLE",
+				"IDENTITY_ALREADY_LINKED",
+				"INVALID_OAUTH_STATE",
+				"REAUTHENTICATION_REQUIRED",
+			].includes(error?.code)) {
+				clearTransactionCookies();
+			}
+			if (["INVITE_ADMISSION_REQUIRED", "INVITE_ADMISSION_INVALID", "INVITE_ADMISSION_UNAVAILABLE"].includes(error?.code)) {
+				metrics.observeAuth?.({provider: provider.slug, outcome: "not_allowed"});
+			}
+			if (error?.code === "IDENTITY_ALREADY_LINKED") {
+				metrics.observeAuth?.({provider: provider.slug, outcome: "already_linked"});
+			}
+			throw error;
+		}
+		clearTransactionCookies();
+		completed.revokedSessionIds.forEach(sessionId => realtime.closeSession({sessionId}));
+		reply.setCookie(SESSION_COOKIE, token, getCookieOptions({
+			isSecure: config.isSecure,
+			maxAge: config.sessionTtlSeconds,
+		}));
+		metrics.observeAuth?.({
+			provider: provider.slug,
+			outcome: transaction.operation === "link" ? "linked" : "succeeded",
+		});
+		return reply.code(redirectStatus).redirect(transaction.returnTo);
+	};
+
 	for (const provider of providerRegistry.getAvailableProviders()) {
 		app.post(`/api/account/reauthentication/${provider.slug}`, {
 			preHandler: [requireMutationSecurity, requireCurrentProtocolVersion],
@@ -1028,6 +1123,56 @@ export async function createHubApp ({
 			metrics.observeAuth?.({provider: provider.slug, outcome: "started"});
 			return reply.redirect(authorizationUrl);
 		});
+
+		if (provider.authenticationType === "password") {
+			const getLoginState = request => {
+				const state = request.method === "POST" ? request.body?.state : request.query?.state;
+				const id = getOAuthTransactionIdFromState(state);
+				if (!id || getSignedCookie(request, getOAuthTransactionCookieName(id)) !== id) {
+					throw new HubStoreError("INVALID_OAUTH_STATE", "Login expired. Start again from the Campaign Hub.", {status: 400});
+				}
+				return {state, id};
+			};
+			app.get("/auth/local/login", {config: {rateLimit: {max: 20, timeWindow: "1 minute"}}}, async (request, reply) => {
+				const {state} = getLoginState(request);
+				return reply.type("text/html; charset=utf-8").send(getLocalLoginHtml({state}));
+			});
+			app.post(provider.callbackPath, {
+				bodyLimit: 8_192,
+				config: {rateLimit: {max: 10, timeWindow: "1 minute"}},
+				schema: {body: {
+					type: "object",
+					additionalProperties: false,
+					required: ["username", "password", "state"],
+					properties: {
+						username: {type: "string", minLength: 1, maxLength: 64},
+						password: {type: "string", minLength: 1, maxLength: 256},
+						state: {type: "string", minLength: 1, maxLength: 512},
+					},
+				}},
+			}, async (request, reply) => {
+				if (request.headers.origin !== config.appOrigin) return reply.code(403).send({error: "INVALID_ORIGIN"});
+				const {state, id} = getLoginState(request);
+				const identity = await provider.pVerifyCredentials(request.body);
+				if (!identity) {
+					metrics.observeAuth?.({provider: provider.slug, outcome: "invalid_credentials"});
+					return reply.code(401).type("text/html; charset=utf-8").send(getLocalLoginHtml({state, isError: true}));
+				}
+				const transaction = await store.pConsumeOAuthTransaction({
+					id,
+					stateHash: getSha256(state),
+					provider: provider.slug,
+					operation: null,
+					redirectUri: `${config.appOrigin}${provider.callbackPath}`,
+				});
+				const clearTransactionCookies = () => {
+					reply.clearCookie(getOAuthTransactionCookieName(id), getClearCookieOptions({isSecure: config.isSecure}));
+					if (getSignedCookie(request, OAUTH_COOKIE) === id) reply.clearCookie(OAUTH_COOKIE, getClearCookieOptions({isSecure: config.isSecure}));
+				};
+				return pCompleteProviderSession({request, reply, provider, transaction, identity, clearTransactionCookies, redirectStatus: 303});
+			});
+			continue;
+		}
 
 		app.get(provider.callbackPath, {
 			config: {rateLimit: {max: 20, timeWindow: "1 minute"}},
@@ -1130,79 +1275,7 @@ export async function createHubApp ({
 				if (error instanceof AuthProviderError) throw error;
 				throw new AuthProviderError();
 			}
-			const priorAuth = await pGetAuth(request);
-			const token = transaction.operation === "link"
-				? getDeterministicToken({
-					secret: config.cookieSecret,
-					namespace: "hub-identity-link-session",
-					parts: [transaction.id],
-				})
-				: getRandomToken();
-			let completed;
-			try {
-				if (transaction.operation === "reauthenticate") {
-					completed = await store.pCompleteOAuthReauthentication({
-						identity,
-						tokenHash: getSha256(token),
-						expiresAt: new Date(Date.now() + config.sessionTtlSeconds * 1_000),
-						userAgent: request.headers["user-agent"] || null,
-						currentSessionId: priorAuth?.session.id || null,
-						oauthTransactionId: transaction.id,
-					});
-				} else if (transaction.operation === "sign_in") {
-					completed = await store.pCompleteOAuthSignIn({
-						identity,
-						tokenHash: getSha256(token),
-						expiresAt: new Date(Date.now() + config.sessionTtlSeconds * 1_000),
-						userAgent: request.headers["user-agent"] || null,
-						priorSessionId: priorAuth?.session.id || null,
-						oauthTransactionId: transaction.id,
-						isNewAccountAdmissionEnabled: config.isInviteAccountAdmissionEnabled,
-					});
-				} else if (transaction.operation === "link") {
-					completed = await store.pCompleteOAuthLink({
-						identity,
-						tokenHash: getSha256(token),
-						expiresAt: new Date(Date.now() + config.sessionTtlSeconds * 1_000),
-						userAgent: request.headers["user-agent"] || null,
-						currentAccountId: priorAuth?.account.id || null,
-						currentSessionId: priorAuth?.session.id || null,
-						oauthTransactionId: transaction.id,
-						availableProviders: providerRegistry.getAvailableProviders().map(current => current.slug),
-					});
-				} else {
-					throw new HubStoreError("INVALID_OAUTH_STATE", `OAuth transaction is invalid.`, {status: 400});
-				}
-			} catch (error) {
-				if ([
-					"INVITE_ADMISSION_REQUIRED",
-					"INVITE_ADMISSION_INVALID",
-					"ACCOUNT_UNAVAILABLE",
-					"IDENTITY_ALREADY_LINKED",
-					"INVALID_OAUTH_STATE",
-					"REAUTHENTICATION_REQUIRED",
-				].includes(error?.code)) {
-					clearTransactionCookies();
-				}
-				if (["INVITE_ADMISSION_REQUIRED", "INVITE_ADMISSION_INVALID", "INVITE_ADMISSION_UNAVAILABLE"].includes(error?.code)) {
-					metrics.observeAuth?.({provider: provider.slug, outcome: "not_allowed"});
-				}
-				if (error?.code === "IDENTITY_ALREADY_LINKED") {
-					metrics.observeAuth?.({provider: provider.slug, outcome: "already_linked"});
-				}
-				throw error;
-			}
-			clearTransactionCookies();
-			completed.revokedSessionIds.forEach(sessionId => realtime.closeSession({sessionId}));
-			reply.setCookie(SESSION_COOKIE, token, getCookieOptions({
-				isSecure: config.isSecure,
-				maxAge: config.sessionTtlSeconds,
-			}));
-			metrics.observeAuth?.({
-				provider: provider.slug,
-				outcome: transaction.operation === "link" ? "linked" : "succeeded",
-			});
-			return reply.redirect(transaction.returnTo);
+			return pCompleteProviderSession({request, reply, provider, transaction, identity, clearTransactionCookies});
 		});
 	}
 

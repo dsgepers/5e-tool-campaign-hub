@@ -1,0 +1,18 @@
+# Personal login using server-only JSON credentials; no OAuth application needed.
+# First run: npm run hub:user -- --username dennis
+# Provider settings are commented out by host preference in this checkout.
+# Uncomment all four settings below to enable password login with this overlay.
+services:
+  bff:
+    environment:
+      #HUB_AUTH_MODE: local
+     # HUB_LOCAL_USERS_FILE: /run/hub/users.json
+      #HUB_IDENTITY_RETENTION_REQUIRED_PROVIDERS: local
+      #HUB_ACCOUNT_IDENTITY_LINKING_ENABLED: "false"
+    volumes:
+      - type: bind
+        source: ./.hub/users.json
+        target: /run/hub/users.json
+        read_only: true
+        bind:
+          create_host_path: false
