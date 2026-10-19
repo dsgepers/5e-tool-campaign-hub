@@ -107,8 +107,8 @@ services:
       HUB_PEER_SOURCE_COSTS_CAMPAIGN_IDS: ${HUB_PEER_SOURCE_COSTS_CAMPAIGN_IDS:-}
       HUB_PORT: '5052'
       HUB_TRUST_PROXY: ${HUB_TRUST_PROXY:-172.30.0.10}
-      HUB_AUTH_MODE: local
-      HUB_LOCAL_USERS_FILE: /run/hub/users.json
+      #HUB_AUTH_MODE: local
+      #HUB_LOCAL_USERS_FILE: /run/hub/users.json
     networks:
       hub-egress: {}
       hub-private: {}
