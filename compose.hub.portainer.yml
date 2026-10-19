@@ -1,12 +1,22 @@
 # Standalone OAuth Campaign Hub with Cloudflare Tunnel for Portainer.
 # Portainer: Environment variables -> Load variables from .env file -> .env.hub.
 # Uploading this Compose file does not import the separate environment file.
-# No host checkout or HUB_PROJECT_DIR is required at runtime.
+# No host checkout, prebuilt app images or HUB_PROJECT_DIR is required.
 # config-init writes the Caddy/PostgreSQL files into the managed hub-project volume.
-# App images must already be built/loaded on the selected Docker endpoint.
+# Compose builds app images from the public Git context before starting services.
 # Existing named data volumes retain their names; stop the old stack before handover.
 # Target Docker Standalone (not Swarm). Setup: docs/hub/portainer.md.
 name: thelemartools-hub
+x-hub-bff: &hub-bff
+  image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+  pull_policy: build
+  build:
+    context: ${HUB_BUILD_CONTEXT:-https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub}
+    dockerfile: server/Dockerfile
+    args:
+      NPM_REGISTRY: ${HUB_NPM_REGISTRY:-https://registry.npmjs.org/}
+      VERSION: ${HUB_IMAGE_VERSION:-dev}
+      VCS_REF: ${HUB_VCS_REF:-unknown}
 services:
   config-init:
     image: caddy:2.8.4-alpine
@@ -126,7 +136,7 @@ services:
       config-init:
         condition: service_completed_successfully
   migrate:
-    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    <<: *hub-bff
     command:
       - node
       - server/scripts/migrate.mjs
@@ -139,9 +149,8 @@ services:
     networks:
       hub-private: {}
     restart: 'no'
-    pull_policy: never
   grant-roles:
-    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    <<: *hub-bff
     command:
       - node
       - server/scripts/grant-roles.mjs
@@ -160,9 +169,8 @@ services:
     networks:
       hub-private: {}
     restart: 'no'
-    pull_policy: never
   bff:
-    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    <<: *hub-bff
     depends_on:
       grant-roles:
         condition: service_completed_successfully
@@ -203,13 +211,17 @@ services:
     restart: unless-stopped
     tmpfs:
       - /tmp:size=16m,mode=1777
-    pull_policy: never
   static:
     image: ${HUB_STATIC_IMAGE:-thelemartools-hub-static:latest}
+    pull_policy: build
+    build:
+      context: ${HUB_BUILD_CONTEXT:-https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub}
+      dockerfile: deploy/hub/static.Dockerfile
+      args:
+        NPM_REGISTRY: ${HUB_NPM_REGISTRY:-https://registry.npmjs.org/}
     networks:
       hub-private: {}
     restart: unless-stopped
-    pull_policy: never
   edge:
     image: caddy:2.8.4-alpine
     depends_on:
@@ -259,7 +271,7 @@ services:
         ipv4_address: ${HUB_TUNNEL_CONNECTOR_IP:-172.31.0.10}
     restart: unless-stopped
   maintenance:
-    image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
+    <<: *hub-bff
     command:
       - node
       - server/scripts/maintenance.mjs
@@ -275,9 +287,15 @@ services:
     profiles:
       - maintenance
     restart: 'no'
-    pull_policy: never
   backup:
     image: ${HUB_OPS_IMAGE:-thelemartools-hub-ops:latest}
+    pull_policy: build
+    build:
+      context: ${HUB_BUILD_CONTEXT:-https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub}
+      dockerfile: server/ops.Dockerfile
+      args:
+        VERSION: ${HUB_IMAGE_VERSION:-dev}
+        VCS_REF: ${HUB_VCS_REF:-unknown}
     command:
       - sh
       - -ec
@@ -298,7 +316,6 @@ services:
       - source: hub-backups
         target: /backups
         type: volume
-    pull_policy: never
 volumes:
   hub-backups:
     name: ${HUB_VOLUME_PREFIX:-thelemartools-hub}_hub-backups

@@ -6,14 +6,17 @@
 ## Status
 
 The personal full-Hub tunnel topology also has a standalone Portainer Compose file
-(`compose.hub.portainer.yml`). It references prepared app images and explicitly named
+(`compose.hub.portainer.yml`). It builds app images from public Git and uses explicitly named
 volumes, with a network-isolated initializer supplying Caddy/PostgreSQL configuration.
 No host paths or project directory are required. It selects OAuth with provider linking.
 Fresh PostgreSQL initialization, config rendering and retained data after recreation
 are locally validated. The complete standalone stack was also started locally with
 rebuilt images and the real environment on 2026-10-19; public HTTPS page/API checks
-passed through Cloudflare after correcting its route. Browser OAuth completion and
-Portainer UI deployment remain unverified. See [evidence](testing.md#managed-volume-portainer-validation)
+passed through Cloudflare after correcting its route. Browser OAuth completion
+remains unverified. A separate real Portainer API deployment with absent
+image tags and isolated synthetic resources verified automatic Git builds and healthy
+page/API startup; see [build evidence](testing.md#automatic-portainer-git-build-validation).
+See also [earlier live-ingress evidence](testing.md#managed-volume-portainer-validation)
 and [setup](portainer.md). This does not promote the managed Oracle baseline.
 
 The optional [Cloudflare Tunnel overlay](cloudflare-tunnel.md) is implemented for

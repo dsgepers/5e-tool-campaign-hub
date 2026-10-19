@@ -3,7 +3,8 @@
 Use `compose.hub.portainer.yml` by itself for PostgreSQL, the Hub backend, website,
 OAuth login, Caddy and Cloudflare Tunnel. Target a **Docker Standalone** environment.
 There are no bind mounts or `HUB_PROJECT_DIR` requirements. App code is in the
-prepared images; Docker manages configuration and database storage as named volumes.
+images built automatically from Git; Docker manages configuration and database storage
+as named volumes.
 
 ## Configuration volume
 
@@ -27,32 +28,51 @@ files. Redeploy/recreate the edge after changing the Caddy configuration so it l
 the new contents. The embedded files track `deploy/hub/Caddyfile.tunnel` and
 `deploy/hub/init-roles.sh`; keep those copies in sync when changing routing or roles.
 
-## Prepare app images
+## Automatic app-image builds
 
-Build or load the app images on the **same Docker endpoint that Portainer will
-deploy to**. From a source checkout on a build host:
+The Git build workflow is defined in [ADR 0023](adr/0023-portainer-git-builds.md).
+It was verified through a real local Portainer deployment starting with absent app
+image tags; see [evidence and limits](testing.md#automatic-portainer-git-build-validation).
 
-```sh
-docker build -f server/Dockerfile -t thelemartools-hub-bff:latest .
-docker build -f deploy/hub/static.Dockerfile -t thelemartools-hub-static:latest .
+The Compose file includes `build` definitions for the website, backend and optional
+operations image. Their default context is the public repository:
+
+```text
+https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub
 ```
 
-On a different target host, transfer these with `docker save`/`docker load`, or
-build there. The checkout is needed for building, not for running the stack.
-Existing images with those tags can be reused if built from the desired source.
-The app services use `pull_policy: never`; keep Portainer's **Re-pull image** option
-off for local image tags. Optional `HUB_BFF_IMAGE`, `HUB_STATIC_IMAGE` and
-`HUB_OPS_IMAGE` select other already-loaded tags. The PostgreSQL, Caddy and
-cloudflared images can be pulled normally.
+Compose downloads that source and uses `server/Dockerfile`,
+`deploy/hub/static.Dockerfile` and (for backups) `server/ops.Dockerfile`.
+`pull_policy: build` builds the app images before starting their containers instead
+of looking for unpublished tags on Docker Hub. Migration, role-grant and maintenance
+services share the backend build definition. No manual `docker build`, image
+transfer, source checkout or registry publication is required.
+
+The Docker build environment needs outbound access to GitHub, the base-image
+registries, npm and the Debian package repositories. First deployment takes longer
+while downloading source/dependencies. Later builds reuse the builder cache.
+Runtime database passwords, OAuth credentials and tunnel tokens are environment
+variables for containers; they are not passed as build arguments.
+
+Optional `HUB_BUILD_CONTEXT` selects another public Git context, such as the same
+repository URL with a specific commit after `#`. The Git context must already contain
+the desired application code; local uncommitted files are not included. For CLI
+work on a local checkout only, set `HUB_BUILD_CONTEXT=.`. Optional `HUB_BFF_IMAGE`,
+`HUB_STATIC_IMAGE` and `HUB_OPS_IMAGE` change the resulting local image tags.
+`HUB_NPM_REGISTRY` controls npm during builds. You do not need any of these overrides
+for the default deployment.
+
+See Docker's [build-context reference](https://docs.docker.com/reference/compose-file/build/#context)
+and [pull-policy reference](https://docs.docker.com/reference/compose-file/services/#pull_policy).
+Use Docker Standalone; Swarm stack deployment does not build these images.
 
 ## Deploy through Portainer
 
-The complete standalone stack has also been started locally with rebuilt app
-images and checked through a live Cloudflare route; see the exact
-[validation evidence and limits](testing.md#managed-volume-portainer-validation).
-Successful local startup does not put images on another Docker endpoint. If
-Portainer reports `No such image: thelemartools-hub-static:latest`, build/load both
-app images on its selected endpoint using the preparation steps above.
+Replace any older image-only copy of `compose.hub.portainer.yml` in Portainer with
+the updated file containing the `build` definitions. Keeping the old copy will
+continue to produce `No such image` errors. A new stack does not need a Re-pull
+image setting: `pull_policy: build` in the YAML controls application builds.
+If configuring GitOps updates later, leave its optional Re-pull image setting off.
 
 1. Choose the Docker Standalone endpoint, then **Stacks → Add stack**. Use
    `thelemartools-hub` for an existing default installation.
@@ -70,6 +90,29 @@ app images on its selected endpoint using the preparation steps above.
 Portainer's [stack documentation](https://docs.portainer.io/user/docker/stacks/add)
 explains uploading a Compose file and importing environment variables. No repository
 checkout, relative-path volume feature or local credential JSON is needed at runtime.
+
+### Deploy directly from the Git repository
+
+Choose **Git Repository** when adding the stack, with these values:
+
+| Field | Value |
+|---|---|
+| Repository URL/source | `https://github.com/dsgepers/5e-tool-campaign-hub.git` |
+| Repository reference | `refs/heads/multiplayer-hub` |
+| Compose path | `compose.hub.portainer.yml` |
+| Additional Compose files | None |
+
+Load `.env.hub` through **Environment variables** on that deployment page, then
+deploy. GitOps automatic updates are optional. The Re-pull image toggle belongs
+to update settings in versions that expose it; it is not a prerequisite for
+creating this stack.
+
+Portainer reads the committed Compose file from the chosen remote ref. Local edits,
+including staged but uncommitted changes, are not available until committed and
+pushed. If repository deployment still reports a missing local app image, inspect
+that branch's Compose file for `x-hub-bff`, `build` and `pull_policy: build`; the
+old image-only file cannot build the missing image regardless of environment values.
+Do not select the default `docker-compose.yml` or `compose.hub.yml` for this topology.
 
 ### Missing environment-variable errors
 
@@ -130,13 +173,9 @@ then start the old CLI stack with its original configuration files and volume pr
 
 ## Updates and optional jobs
 
-After rebuilding/loading an app image, redeploy with re-pulling off and container
-recreation. The original opt-in backup and maintenance profiles remain available.
-For backups, prepare the operations image first:
-
-```sh
-docker build -f server/ops.Dockerfile -t thelemartools-hub-ops:latest .
-```
+Redeploy with re-pulling off after pushing application changes to the configured
+Git ref; Compose rebuilds the app images. The original opt-in backup and maintenance
+profiles remain available, and the backup job builds its operations image when used.
 
 The same standalone file also works through the CLI without a project directory:
 

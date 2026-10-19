@@ -4,10 +4,40 @@
 > **Last updated:** 2026-10-17
 > **Owner:** Campaign Hub maintainers
 
+## Automatic Portainer Git build validation
+
+On 2026-10-19 the standalone file gained remote Git `build` definitions and
+`pull_policy: build`; see [ADR 0023](adr/0023-portainer-git-builds.md).
+
+- Compose built backend and website images from the public `multiplayer-hub` Git
+  context, without using a local checkout as the source. The remote ref resolved to
+  `cbcdd3c6c64ed7734b1b9671e045fec215284ebe`. New image tags were used so preloaded
+  application images could not mask the original missing-image failure.
+- A temporary localhost-only Portainer CE 2.45.2 instance registered the local
+  Docker socket. Its real standalone/string stack API accepted the updated Compose
+  file plus environment variables and built a second pair of initially absent tags.
+- That deployment used a separate project/volume prefix, unused network subnets and
+  synthetic database/OAuth credentials. Only the test copy's project/container names
+  changed, and cloudflared was placed behind an inactive profile so this synthetic
+  test could not use the real public tunnel. Application build contexts and the
+  initialization/database/migration/backend/static/edge definitions were unchanged.
+- PostgreSQL and backend became healthy; config initialization, migrations and role
+  grants exited zero. Static and Caddy ran. From the configured connector IP on the
+  test tunnel network, homepage, Hub, Character Sheet, liveness, database readiness,
+  signed-out session and provider metadata returned nonempty HTTP 200 responses.
+  GitHub OAuth start returned 302.
+- The optional operations image was also built through the remote Git context.
+  No live backup job or browser OAuth callback was executed.
+
+The disposable test stack and temporary Portainer were removed after validation;
+existing Hub data volumes were not mounted by the test. Earlier live Cloudflare
+ingress qualification is recorded below. This does not establish compatibility with
+every Portainer version or test the user's separate Portainer endpoint.
+
 ## Managed-volume Portainer validation
 
-Full local startup was additionally verified on 2026-10-19 using the real private
-environment file and the standalone file alone:
+Before automatic Git builds were added, full local startup was verified on
+2026-10-19 using the real private environment and the image-only standalone file:
 
 ```sh
 docker build -f server/Dockerfile -t thelemartools-hub-bff:latest .
@@ -34,7 +64,8 @@ and `/api/meta`. Public DNS resolvers returned the hostname's Cloudflare address
 these checks used `curl --resolve` to bypass the local resolver's stale negative
 cache, with normal TLS certificate verification. This proves real tunnel ingress,
 not browser OAuth completion, authenticated campaign operations, or deployment
-through Portainer's UI. App images must still exist on the endpoint Portainer uses.
+through Portainer's UI. At that point app images had to be prepared on the target
+endpoint; automatic builds above subsequently removed that prerequisite.
 
 Local working-tree checks on 2026-10-19, using only synthetic credentials and isolated resources:
 

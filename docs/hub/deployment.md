@@ -10,7 +10,7 @@ For the full Hub behind Cloudflare Tunnel, see [the tunnel guide](cloudflare-tun
 and add `compose.hub.tunnel.yml` last. That overlay replaces the edge's published
 ports with a connector-only HTTP origin; it does not alter the default local stack.
 For Portainer Docker Standalone, [the one-file stack](portainer.md) uses
-`compose.hub.portainer.yml`, prepared app images and managed configuration/data volumes.
+`compose.hub.portainer.yml`, automatic Git app-image builds and managed configuration/data volumes.
 Its initializer removes the need for host paths or `HUB_PROJECT_DIR` at runtime.
 
 ## Purpose

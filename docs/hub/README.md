@@ -168,4 +168,5 @@ Decision: [ADR 0022: Personal file-backed login](adr/0022-personal-file-login.md
 Use [Cloudflare Tunnel](cloudflare-tunnel.md) to expose the full personal Hub through
 one public HTTPS hostname with `compose.hub.tunnel.yml`.
 For the complete stack in one file, use [Portainer setup](portainer.md) and
-`compose.hub.portainer.yml`.
+`compose.hub.portainer.yml`. App images build automatically from Git; see
+[ADR 0023: Portainer Git builds](adr/0023-portainer-git-builds.md).

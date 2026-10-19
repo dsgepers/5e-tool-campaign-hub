@@ -50,9 +50,15 @@ database data; consumers mount configuration read-only. Recreate the edge after
 managed Caddy configuration changes. Explicit volume names prevent a stack-name change from selecting
 an empty database, but the host must confirm any custom existing volume prefix and
 stop the old installation before handover. Two PostgreSQL containers must never
-share a data volume concurrently. [Portainer setup](portainer.md) covers prepared
-images, managed configuration, retained data and rollback; no running stack is changed
+share a data volume concurrently. [Portainer setup](portainer.md) covers automatic
+Git builds, managed configuration, retained data and rollback; no running stack is changed
 by configuration validation.
+
+[ADR 0023](adr/0023-portainer-git-builds.md) removes the preloaded-image requirement.
+Build availability now depends on the public Git ref and dependency registries.
+Use `HUB_BUILD_CONTEXT` with a commit ref for fixed source selection; runtime secrets
+are not passed to builds. An isolated real Portainer deployment verified missing-tag
+builds and service startup without touching existing Hub data volumes.
 
 The personal Cloudflare overlay addresses R-08 by restricting Caddy's origin
 listener to the connector's exact IP, preserving `CF-Connecting-IP` only from
