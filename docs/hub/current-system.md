@@ -22,7 +22,7 @@ origin and sets the public HTTPS origin, without changing application authority
 or the deployed Oracle baseline.
 The same personal topology is available in one file for Portainer Docker Standalone:
 `compose.hub.portainer.yml`; see [automatic builds and handover](portainer.md).
-This variant builds its app images from a public Git context, selects OAuth and
+This variant builds its app images from Portainer's repository checkout, selects OAuth and
 initializes deployment files in a managed configuration volume. It requires no host
 checkout or preloaded app images; see [ADR 0023](adr/0023-portainer-git-builds.md).
 

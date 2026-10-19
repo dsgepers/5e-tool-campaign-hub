@@ -11,19 +11,23 @@ file required manual builds or transfers, preventing Compose-plus-environment de
 
 ## Decision
 
-`compose.hub.portainer.yml` declares remote Git build contexts and
-`pull_policy: build` for application services. The default source is the public
-`dsgepers/5e-tool-campaign-hub` repository's `multiplayer-hub` branch. Backend jobs
+`compose.hub.portainer.yml` declares local build contexts (`.`) and
+`pull_policy: build` for application services. In Portainer Git Repository mode,
+Portainer checks out the selected ref and supplies its files to the builder. The
+Docker builder does not perform a second Git clone or require a Git executable. Backend jobs
 share one build definition; the website and optional backup image use their own
-Dockerfiles. `HUB_BUILD_CONTEXT` can select a different source ref, including a
-pinned commit. Published infrastructure images continue to use normal registry pulls.
+Dockerfiles. Select a source branch/tag/commit through Portainer's repository reference.
+`HUB_BUILD_CONTEXT` remains an optional context override; remote Git overrides need
+a Git-capable builder. Published infrastructure images use normal registry pulls.
 
 ## Consequences
 
-The selected build environment needs GitHub, base-image, npm and package-repository
-access. Deployment builds take time and may fail before containers start. A branch
-ref follows committed changes; pin a commit when reproducible source selection is
-needed. Runtime credentials are not build arguments. Keep the Docker build contexts'
+Portainer needs GitHub access for the checkout; the builder needs base-image, npm
+and package-repository access. The initial remote Git default was revised after a
+target builder lacked Git. GitHub archives also add a root directory and are not a
+drop-in context for these Dockerfiles. Repository deployment with `.` avoids both issues. Deployment builds take time and may fail before containers start. A branch
+reference follows committed changes; pin a commit/tag in Portainer when reproducible
+source selection is needed. Runtime credentials are not build arguments. Keep the Docker build contexts'
 credential exclusions and never put secrets in a Git URL.
 
 Managed configuration/data volumes, proxy trust, OAuth admission and all application

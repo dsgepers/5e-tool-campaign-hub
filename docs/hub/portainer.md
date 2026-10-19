@@ -35,48 +35,48 @@ It was verified through a real local Portainer deployment starting with absent a
 image tags; see [evidence and limits](testing.md#automatic-portainer-git-build-validation).
 
 The Compose file includes `build` definitions for the website, backend and optional
-operations image. Their default context is the public repository:
+operations image. Their default context is `.`: the source checkout Portainer creates
+when deploying with **Git Repository**. Docker receives those files as a local build
+context and does not need to run Git to fetch the source again.
 
-```text
-https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub
-```
+Compose uses `server/Dockerfile`, `deploy/hub/static.Dockerfile` and (for backups)
+`server/ops.Dockerfile`. `pull_policy: build` builds app images before starting
+containers instead of looking for unpublished tags on Docker Hub. Migration,
+role-grant and maintenance services share the backend build definition. No manual
+host checkout, `docker build`, image transfer or registry publication is required.
 
-Compose downloads that source and uses `server/Dockerfile`,
-`deploy/hub/static.Dockerfile` and (for backups) `server/ops.Dockerfile`.
-`pull_policy: build` builds the app images before starting their containers instead
-of looking for unpublished tags on Docker Hub. Migration, role-grant and maintenance
-services share the backend build definition. No manual `docker build`, image
-transfer, source checkout or registry publication is required.
+Portainer needs access to GitHub to fetch the repository. The Docker build environment
+needs the base-image registries, npm and Debian package repositories. First deployment
+takes longer while downloading dependencies; later builds reuse the builder cache.
+Runtime database passwords, OAuth credentials and tunnel tokens are container
+environment variables and are not passed as build arguments.
 
-The Docker build environment needs outbound access to GitHub, the base-image
-registries, npm and the Debian package repositories. First deployment takes longer
-while downloading source/dependencies. Later builds reuse the builder cache.
-Runtime database passwords, OAuth credentials and tunnel tokens are environment
-variables for containers; they are not passed as build arguments.
+Keep `HUB_BUILD_CONTEXT=.` (or omit it). To pin application source, select a commit
+or tag through Portainer's **Repository reference**; its Compose file and app build
+context then come from the same checkout. Optional `HUB_BFF_IMAGE`, `HUB_STATIC_IMAGE`
+and `HUB_OPS_IMAGE` change the resulting local image tags. `HUB_NPM_REGISTRY` controls
+npm during builds.
 
-Optional `HUB_BUILD_CONTEXT` selects another public Git context, such as the same
-repository URL with a specific commit after `#`. The Git context must already contain
-the desired application code; local uncommitted files are not included. For CLI
-work on a local checkout only, set `HUB_BUILD_CONTEXT=.`. Optional `HUB_BFF_IMAGE`,
-`HUB_STATIC_IMAGE` and `HUB_OPS_IMAGE` change the resulting local image tags.
-`HUB_NPM_REGISTRY` controls npm during builds. You do not need any of these overrides
-for the default deployment.
+The default now requires **Git Repository** mode. Uploading/pasting only this YAML
+cannot supply its Dockerfiles and source. An explicit remote Git `HUB_BUILD_CONTEXT`
+is still supported for that workflow if the builder has Git, but it is unnecessary
+for repository deployments and may fail on builders without Git. GitHub tarballs
+are not interchangeable with the checkout: their extra enclosing directory prevents
+these Dockerfiles from finding files at the build-context root.
 
-See Docker's [build-context reference](https://docs.docker.com/reference/compose-file/build/#context)
-and [pull-policy reference](https://docs.docker.com/reference/compose-file/services/#pull_policy).
+See Docker's [build-context reference](https://docs.docker.com/reference/compose-file/build/#context).
 Use Docker Standalone; Swarm stack deployment does not build these images.
 
 ## Deploy through Portainer
 
-Replace any older image-only copy of `compose.hub.portainer.yml` in Portainer with
-the updated file containing the `build` definitions. Keeping the old copy will
-continue to produce `No such image` errors. A new stack does not need a Re-pull
+Use the current repository branch and `compose.hub.portainer.yml` path listed below.
+Older image-only copies continue to produce `No such image` errors. A new stack does not need a Re-pull
 image setting: `pull_policy: build` in the YAML controls application builds.
 If configuring GitOps updates later, leave its optional Re-pull image setting off.
 
 1. Choose the Docker Standalone endpoint, then **Stacks → Add stack**. Use
    `thelemartools-hub` for an existing default installation.
-2. Paste/upload the updated `compose.hub.portainer.yml` as the only Compose file.
+2. Select **Git Repository** and enter the repository settings below.
 3. Under **Environment variables**, load your private `.env.hub`, preserving the
    existing database/cookie/CSRF/invite/metrics secrets. Use the exact key
    `HUB_COOKIE_SECRET`; suffixes or misspelled keys are not recognized.
@@ -88,8 +88,9 @@ If configuring GitOps updates later, leave its optional Re-pull image setting of
 6. Complete the handover below if a previous stack is running, then deploy.
 
 Portainer's [stack documentation](https://docs.portainer.io/user/docker/stacks/add)
-explains uploading a Compose file and importing environment variables. No repository
-checkout, relative-path volume feature or local credential JSON is needed at runtime.
+explains repository deployment and importing environment variables. No manual host
+checkout, relative-path volume feature or local credential JSON is needed. Portainer
+manages the checkout for the build; running containers use images and named volumes.
 
 ### Deploy directly from the Git repository
 
@@ -113,6 +114,20 @@ pushed. If repository deployment still reports a missing local app image, inspec
 that branch's Compose file for `x-hub-bff`, `build` and `pull_policy: build`; the
 old image-only file cannot build the missing image regardless of environment values.
 Do not select the default `docker-compose.yml` or `compose.hub.yml` for this topology.
+
+### Builder cannot find Git
+
+If source fetching fails with `exec: "git": executable file not found in $PATH`,
+set this in Portainer's deployment **Environment variables**, then redeploy:
+
+```dotenv
+HUB_BUILD_CONTEXT=.
+```
+
+This overrides the old remote Git build context, making Docker build from the checkout
+Portainer already fetched in Repository mode. Installing Git in the app Dockerfile
+cannot fix a source-fetch failure that happens before Dockerfile execution. The current
+Compose file uses `.` by default, but an older environment override takes precedence.
 
 ### Missing environment-variable errors
 
@@ -174,7 +189,7 @@ then start the old CLI stack with its original configuration files and volume pr
 ## Updates and optional jobs
 
 Redeploy with re-pulling off after pushing application changes to the configured
-Git ref; Compose rebuilds the app images. The original opt-in backup and maintenance
+repository ref; Compose rebuilds the app images. The original opt-in backup and maintenance
 profiles remain available, and the backup job builds its operations image when used.
 
 The same standalone file also works through the CLI without a project directory:

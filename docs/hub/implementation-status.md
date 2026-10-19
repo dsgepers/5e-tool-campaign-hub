@@ -6,7 +6,7 @@
 ## Status
 
 The personal full-Hub tunnel topology also has a standalone Portainer Compose file
-(`compose.hub.portainer.yml`). It builds app images from public Git and uses explicitly named
+(`compose.hub.portainer.yml`). It builds app images from Portainer's repository checkout and uses explicitly named
 volumes, with a network-isolated initializer supplying Caddy/PostgreSQL configuration.
 No host paths or project directory are required. It selects OAuth with provider linking.
 Fresh PostgreSQL initialization, config rendering and retained data after recreation

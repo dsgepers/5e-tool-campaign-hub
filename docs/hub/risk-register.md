@@ -55,9 +55,10 @@ Git builds, managed configuration, retained data and rollback; no running stack 
 by configuration validation.
 
 [ADR 0023](adr/0023-portainer-git-builds.md) removes the preloaded-image requirement.
-Build availability now depends on the public Git ref and dependency registries.
-Use `HUB_BUILD_CONTEXT` with a commit ref for fixed source selection; runtime secrets
-are not passed to builds. An isolated real Portainer deployment verified missing-tag
+Build availability depends on Portainer fetching its repository ref and the dependency
+registries. Pin a commit/tag in Portainer's Repository reference for fixed source
+selection; runtime secrets are not passed to builds. The default `HUB_BUILD_CONTEXT=.`
+uses that checkout, avoiding a second Git clone by builders that lack Git. An isolated real Portainer deployment verified missing-tag
 builds and service startup without touching existing Hub data volumes.
 
 The personal Cloudflare overlay addresses R-08 by restricting Caddy's origin

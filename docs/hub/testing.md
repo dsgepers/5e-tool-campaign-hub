@@ -6,6 +6,39 @@
 
 ## Automatic Portainer Git build validation
 
+### Repository checkout context without builder Git
+
+The original remote Git context succeeded locally but a target builder failed
+before Dockerfile execution because its Git executable was absent. The context
+default was changed to `.` for Portainer **Git Repository** mode, using the source
+checkout Portainer already fetched. The private environment also sets
+`HUB_BUILD_CONTEXT=.` so older published Compose versions can use this path.
+
+On 2026-10-19 a temporary localhost-only Portainer CE 2.45.2 instance was tested
+through the actual `standalone/repository` stack API, selecting the public repository,
+`refs/heads/multiplayer-hub`, and `compose.hub.portainer.yml`. The published source
+was `4abd28565a5717652d1d9c903e06ac00a3796c7e`; its old Git context was overridden
+with `HUB_BUILD_CONTEXT=.`. Both app-image tags were absent before deployment.
+Portainer sent local build contexts rather than asking Docker to fetch a Git URL,
+built the images and reported successful stack deployment.
+
+The test used a separate project/volume prefix, unused subnets and only synthetic
+credentials. It aborted if the fixed connector container name already existed.
+PostgreSQL and the backend became healthy; initialization, migrations and role grants
+exited zero; static and Caddy ran. The connector's synthetic token was deliberately
+invalid, so no real tunnel was used; that test container was removed before probing
+from its configured IP. Website, Hub, Character Sheet, liveness, readiness, session
+and provider metadata returned nonempty HTTP 200 responses; GitHub OAuth start
+returned 302. Only disposable test resources were removed afterward.
+
+A GitHub source-archive alternative was also attempted and rejected: the downloaded
+archive wraps the repository in a directory, so the Dockerfile paths were not found.
+No archive-context configuration was retained. The repository-checkout path avoids
+both the absent-builder-Git failure and that archive-layout problem. The user's
+separate endpoint and browser OAuth callback remain unverified.
+
+### Earlier remote Git context checks
+
 On 2026-10-19 the standalone file gained remote Git `build` definitions and
 `pull_policy: build`; see [ADR 0023](adr/0023-portainer-git-builds.md).
 

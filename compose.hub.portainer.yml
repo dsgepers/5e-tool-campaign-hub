@@ -1,9 +1,9 @@
 # Standalone OAuth Campaign Hub with Cloudflare Tunnel for Portainer.
 # Portainer: Environment variables -> Load variables from .env file -> .env.hub.
 # Uploading this Compose file does not import the separate environment file.
-# No host checkout, prebuilt app images or HUB_PROJECT_DIR is required.
+# Deploy using Portainer Git Repository mode; no manual host checkout or images needed.
 # config-init writes the Caddy/PostgreSQL files into the managed hub-project volume.
-# Compose builds app images from the public Git context before starting services.
+# Compose builds app images from the Portainer repository checkout before starting services.
 # Existing named data volumes retain their names; stop the old stack before handover.
 # Target Docker Standalone (not Swarm). Setup: docs/hub/portainer.md.
 name: thelemartools-hub
@@ -11,7 +11,7 @@ x-hub-bff: &hub-bff
   image: ${HUB_BFF_IMAGE:-thelemartools-hub-bff:latest}
   pull_policy: build
   build:
-    context: ${HUB_BUILD_CONTEXT:-https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub}
+    context: ${HUB_BUILD_CONTEXT:-.}
     dockerfile: server/Dockerfile
     args:
       NPM_REGISTRY: ${HUB_NPM_REGISTRY:-https://registry.npmjs.org/}
@@ -215,7 +215,7 @@ services:
     image: ${HUB_STATIC_IMAGE:-thelemartools-hub-static:latest}
     pull_policy: build
     build:
-      context: ${HUB_BUILD_CONTEXT:-https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub}
+      context: ${HUB_BUILD_CONTEXT:-.}
       dockerfile: deploy/hub/static.Dockerfile
       args:
         NPM_REGISTRY: ${HUB_NPM_REGISTRY:-https://registry.npmjs.org/}
@@ -291,7 +291,7 @@ services:
     image: ${HUB_OPS_IMAGE:-thelemartools-hub-ops:latest}
     pull_policy: build
     build:
-      context: ${HUB_BUILD_CONTEXT:-https://github.com/dsgepers/5e-tool-campaign-hub.git#multiplayer-hub}
+      context: ${HUB_BUILD_CONTEXT:-.}
       dockerfile: server/ops.Dockerfile
       args:
         VERSION: ${HUB_IMAGE_VERSION:-dev}
