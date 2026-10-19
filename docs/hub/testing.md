@@ -6,6 +6,36 @@
 
 ## Managed-volume Portainer validation
 
+Full local startup was additionally verified on 2026-10-19 using the real private
+environment file and the standalone file alone:
+
+```sh
+docker build -f server/Dockerfile -t thelemartools-hub-bff:latest .
+docker build -f deploy/hub/static.Dockerfile -t thelemartools-hub-static:latest .
+docker compose --env-file .env.hub -f compose.hub.portainer.yml up -d
+```
+
+Both images built successfully. PostgreSQL and the BFF became healthy; static,
+edge and cloudflared stayed running. The configuration, migration and role-grant
+jobs exited successfully. Repeating deployment with the rebuilt images retained
+the existing database and its account identities. The stack was left running.
+
+Requests from the connector's actual network namespace verified nonempty homepage,
+Hub and Character Sheet responses; liveness, database readiness, signed-out session
+and provider metadata; and all three OAuth start redirects, callback origins and
+Secure/HttpOnly correlation cookies. A request from a different origin-network peer
+was denied with HTTP 403. Cloudflared readiness returned 200 and four live QUIC
+connections were registered.
+
+The initially configured Cloudflare route targeted the old static-only service.
+After its owner corrected the published application route, public HTTPS returned
+200 for the homepage, Hub, Character Sheet, `/api/live`, `/api/ready`, `/api/session`
+and `/api/meta`. Public DNS resolvers returned the hostname's Cloudflare addresses;
+these checks used `curl --resolve` to bypass the local resolver's stale negative
+cache, with normal TLS certificate verification. This proves real tunnel ingress,
+not browser OAuth completion, authenticated campaign operations, or deployment
+through Portainer's UI. App images must still exist on the endpoint Portainer uses.
+
 Local working-tree checks on 2026-10-19, using only synthetic credentials and isolated resources:
 
 - Parsed the ten-service Portainer Compose model without `HUB_PROJECT_DIR`: every

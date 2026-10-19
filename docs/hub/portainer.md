@@ -47,6 +47,13 @@ cloudflared images can be pulled normally.
 
 ## Deploy through Portainer
 
+The complete standalone stack has also been started locally with rebuilt app
+images and checked through a live Cloudflare route; see the exact
+[validation evidence and limits](testing.md#managed-volume-portainer-validation).
+Successful local startup does not put images on another Docker endpoint. If
+Portainer reports `No such image: thelemartools-hub-static:latest`, build/load both
+app images on its selected endpoint using the preparation steps above.
+
 1. Choose the Docker Standalone endpoint, then **Stacks → Add stack**. Use
    `thelemartools-hub` for an existing default installation.
 2. Paste/upload the updated `compose.hub.portainer.yml` as the only Compose file.

@@ -10,13 +10,17 @@ The personal full-Hub tunnel topology also has a standalone Portainer Compose fi
 volumes, with a network-isolated initializer supplying Caddy/PostgreSQL configuration.
 No host paths or project directory are required. It selects OAuth with provider linking.
 Fresh PostgreSQL initialization, config rendering and retained data after recreation
-are locally validated; no Portainer UI deployment or promotion is claimed. See [setup](portainer.md).
+are locally validated. The complete standalone stack was also started locally with
+rebuilt images and the real environment on 2026-10-19; public HTTPS page/API checks
+passed through Cloudflare after correcting its route. Browser OAuth completion and
+Portainer UI deployment remain unverified. See [evidence](testing.md#managed-volume-portainer-validation)
+and [setup](portainer.md). This does not promote the managed Oracle baseline.
 
 The optional [Cloudflare Tunnel overlay](cloudflare-tunnel.md) is implemented for
 personal full-Hub hosting. It adds a connector, an internal Caddy origin, exact
 connector-IP trust and public-origin configuration, with no schema/application
-changes. Local Compose/proxy validation is separate from live Cloudflare token,
-route and hostname qualification; no public deployment is claimed.
+changes. Standalone local startup and live Cloudflare ingress evidence is recorded
+above; isolated overlay validation remains a separate check.
 
 Personal installations can now opt into [file-based username/password login](local-login.md)
 using the local Compose override. This working-tree change preserves PostgreSQL campaign/session
