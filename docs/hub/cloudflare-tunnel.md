@@ -52,7 +52,8 @@ Use Docker Compose v2.24 or newer. Create file-listed users as described in
 
 For password login, enable the four currently commented provider settings in
 `compose.hub.local.yml` first. Keeping them commented preserves the base OAuth
-selection. The standalone Portainer file selects password login itself.
+selection. The standalone Portainer file selects OAuth and provider linking, using
+managed configuration volumes instead of host files.
 
 ```sh
 docker compose --env-file .env.hub \

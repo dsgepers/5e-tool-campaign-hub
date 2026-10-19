@@ -4,9 +4,34 @@
 > **Last updated:** 2026-10-17
 > **Owner:** Campaign Hub maintainers
 
-## One-file Portainer validation
+## Managed-volume Portainer validation
 
-Local working-tree checks on 2026-10-19:
+Local working-tree checks on 2026-10-19, using only synthetic credentials and isolated resources:
+
+- Parsed the ten-service Portainer Compose model without `HUB_PROJECT_DIR`: every
+  mount is a named volume, the initializer has no network, no host ports are published,
+  and the backend selects OAuth with provider linking and GitHub identity retention.
+- Started the actual `config-init` and PostgreSQL 17.6 services on an isolated project
+  with new volumes. All three runtime/backup/operations roles were created and each
+  authenticated over TCP with its supplied password.
+- Read both generated files from the managed volume and compared them to their
+  canonical templates (indentation normalized). This verifies literal runtime
+  variable preservation through Compose interpolation and shell here-documents.
+  Caddy 2.8.4 validated the resulting volume-mounted Caddyfile.
+- Inserted a sentinel row, removed the test containers/networks without volumes,
+  then recreated initialization and database services. The row and three roles
+  survived, proving the configuration refresh did not reinitialize existing data.
+- Test cleanup removed only the isolated project's resources. No live stack was
+  redeployed and no real OAuth, tunnel or database credentials were used. The
+  existing deployment/documentation contract suites remain the focused regression gate.
+
+No application/store/schema change is involved. This does not qualify Portainer's UI,
+real OAuth callbacks or Cloudflare connectivity. See [Portainer setup](portainer.md).
+
+## Original host-path Portainer validation (historical)
+
+Local checks on 2026-10-19 for the earlier host-path variant, before its replacement
+by the managed-volume configuration above:
 
 - Compared `docker compose --profile '*' config --format json` for
   `compose.hub.portainer.yml` with the merged Hub/local-login/tunnel files, using

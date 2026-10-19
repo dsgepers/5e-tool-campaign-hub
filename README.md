@@ -29,4 +29,5 @@ connector token and Cloudflare route (`http://edge:8080`).
 
 For a single-file Portainer deployment, use `compose.hub.portainer.yml` and
 [the Portainer setup guide](docs/hub/portainer.md). It contains the complete personal
-Hub and tunnel stack, using prepared app images and absolute Docker-host file paths.
+OAuth Hub and tunnel stack, using prepared app images and an automatically populated
+Docker configuration volume. No host project directory is required at runtime.

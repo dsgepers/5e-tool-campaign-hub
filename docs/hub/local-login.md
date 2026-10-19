@@ -26,8 +26,8 @@ Start the existing Hub stack with the local-login override:
 
 In this checkout, the four provider settings in `compose.hub.local.yml` are
 commented out by host preference. Uncomment them to enable password login with
-this overlay. The standalone `compose.hub.portainer.yml` already enables password
-login explicitly and needs no overlay edit.
+this overlay. The standalone `compose.hub.portainer.yml` now selects OAuth and
+managed configuration volumes; use this separate local-login stack for passwords.
 
 ```sh
 docker compose --env-file .env.hub -f compose.hub.yml -f compose.hub.local.yml up --build -d

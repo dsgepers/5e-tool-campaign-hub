@@ -6,9 +6,11 @@
 ## Status
 
 The personal full-Hub tunnel topology also has a standalone Portainer Compose file
-(`compose.hub.portainer.yml`). It references prepared local images, absolute host
-files and explicitly named volumes. Configuration equivalence is locally validated;
-no Portainer UI deployment or production promotion is claimed. See [setup](portainer.md).
+(`compose.hub.portainer.yml`). It references prepared app images and explicitly named
+volumes, with a network-isolated initializer supplying Caddy/PostgreSQL configuration.
+No host paths or project directory are required. It selects OAuth with provider linking.
+Fresh PostgreSQL initialization, config rendering and retained data after recreation
+are locally validated; no Portainer UI deployment or promotion is claimed. See [setup](portainer.md).
 
 The optional [Cloudflare Tunnel overlay](cloudflare-tunnel.md) is implemented for
 personal full-Hub hosting. It adds a connector, an internal Caddy origin, exact

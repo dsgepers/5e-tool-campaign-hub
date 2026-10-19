@@ -43,13 +43,15 @@ PostgreSQL session-rotation regression coverage. OAuth remains the default.
 
 ## Review rule
 
-The standalone Portainer file deliberately duplicates the merged personal topology;
-maintainers must compare its normalized Compose model after changes to the base or
-overlays. Explicit volume names prevent a Portainer stack-name change from selecting
+The standalone Portainer file embeds managed Caddy/PostgreSQL templates; maintainers
+must keep them synchronized with their source files and verify Compose/shell dollar
+escaping. Its network-isolated initializer writes no credentials and never mounts
+database data; consumers mount configuration read-only. Recreate the edge after
+managed Caddy configuration changes. Explicit volume names prevent a stack-name change from selecting
 an empty database, but the host must confirm any custom existing volume prefix and
 stop the old installation before handover. Two PostgreSQL containers must never
 share a data volume concurrently. [Portainer setup](portainer.md) covers prepared
-images, absolute host paths, retained data and rollback; no running stack is changed
+images, managed configuration, retained data and rollback; no running stack is changed
 by configuration validation.
 
 The personal Cloudflare overlay addresses R-08 by restricting Caddy's origin

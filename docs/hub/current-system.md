@@ -21,7 +21,9 @@ Personal deployments can also add [Cloudflare Tunnel](cloudflare-tunnel.md) with
 origin and sets the public HTTPS origin, without changing application authority
 or the deployed Oracle baseline.
 The same personal topology is available in one file for Portainer Docker Standalone:
-`compose.hub.portainer.yml`; see [host/image preparation and handover](portainer.md).
+`compose.hub.portainer.yml`; see [image preparation and handover](portainer.md).
+This variant now selects OAuth and initializes deployment files in a managed
+configuration volume instead of requiring a host checkout at runtime.
 
 ## Product boundary
 
