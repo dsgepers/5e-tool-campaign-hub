@@ -20,7 +20,6 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: 5etools-cloudflared
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:

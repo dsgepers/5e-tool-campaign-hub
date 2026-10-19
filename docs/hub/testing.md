@@ -8,6 +8,12 @@
 
 ### Repository checkout context without builder Git
 
+The tunnel overlay and standalone file subsequently removed the hardcoded
+`5etools-cloudflared` container name after a second stack collided with an existing
+connector. Both resolved Compose models were checked to omit `container_name` on
+`cloudflared`, allowing Compose to assign a project-scoped name. This change does
+not alter service DNS, tunnel credentials, fixed IPs or data-volume selection.
+
 The original remote Git context succeeded locally but a target builder failed
 before Dockerfile execution because its Git executable was absent. The context
 default was changed to `.` for Portainer **Git Repository** mode, using the source

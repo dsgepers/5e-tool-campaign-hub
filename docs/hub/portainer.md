@@ -92,6 +92,12 @@ explains repository deployment and importing environment variables. No manual ho
 checkout, relative-path volume feature or local credential JSON is needed. Portainer
 manages the checkout for the build; running containers use images and named volumes.
 
+The tunnel connector uses Compose's project-scoped container name, such as
+`STACKNAME-cloudflared-1`. It does not reserve the global name `5etools-cloudflared`.
+An older container with that name can remain while deploying the updated file;
+do not delete another stack's container to resolve the naming conflict. Still follow
+the existing-data handover below before sharing database volumes between stacks.
+
 ### Deploy directly from the Git repository
 
 Choose **Git Repository** when adding the stack, with these values:

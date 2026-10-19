@@ -260,7 +260,6 @@ services:
       - tunnel
       - --no-autoupdate
       - run
-    container_name: 5etools-cloudflared
     depends_on:
       edge:
         condition: service_started
